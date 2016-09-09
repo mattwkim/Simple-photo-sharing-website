@@ -6,3 +6,6 @@ main = Blueprint('main', __name__, template_folder='templates')
 def main_route():
     return render_template("index.html")
 
+@main.route('/hello')
+def hello_route():
+    return "Hello Everyone";

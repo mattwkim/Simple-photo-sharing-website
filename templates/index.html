@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+    <h1>INDEX</h1>
+    <p class="center">
+      Welcome!
+    </p>
+
+    <ul>
+    {% for username in usernames %}
+        <li> <a href="albums?username={{username}}" id="user_albums_{{username}}"> {{username}} </a> </li>
+    {% endfor %}
+    </ul>
+{% endblock %}

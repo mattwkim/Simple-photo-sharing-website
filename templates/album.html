@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}'
+
+	{% for photo in photos %}
+		<a text-decoration=none href="/pic?picid={{ photo[0] }}" id="pic_{{ photo[0] }}_link">
+			<img height=100px width=100px src="static/images/{{ photo[0] }}.{{ photo[1] }}">
+		</a>
+	{% endfor %}
+
+{% endblock %}

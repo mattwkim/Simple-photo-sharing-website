@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+	<ul>
+	    {% for i in range(usernamealbums|length)%}
+	    <li><a href="/album?albumid={{thealbumids[i]}}" id="album_{{thealbumids[i]}}_link">{{usernamealbums[i]}}</a></li>
+	    {% endfor %}
+	    <li><a href="/albums/edit?username={{username}}" id="user_albums_edit_{{username}}" style="color: orange;">Edit albums</a></li>
+	</ul>
+{% endblock %}

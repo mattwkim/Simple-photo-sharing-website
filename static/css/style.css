@@ -1,6 +1,77 @@
+/* BASE CSS */
+
+html {
+	height:100%;
+}
+
+body {
+	width: 100%;
+	height:100%;
+}
 
 
-.center {
+/* PIC CSS */
+
+#pic-content {
+	background: #000;
+	height: 100%;
+	width: 100%;
+}
+
+#parent_album {
+	display: block;
+	position: absolute;
+	z-index: 100;
+	color: #999;
+	font-size: 50px;
+	right:20px;
+	top:10px;
+	line-height: 0;
+}
+
+#parent_album:hover {
+	text-decoration: none;
+	cursor: pointer;
+	color: #fff;
+}
+
+.pic-image {
 	margin:0 auto;
-	max-width: 500px;
+	display: block;
+	position: absolute;
+	margin: auto;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	max-width: 100%;
+	max-height: 100%;
+}
+
+.image-container {
+	height:100%;
+
+}
+
+.pic-nav-container {
+	height: 100%;
+	background:#000;
+}
+
+.pic-nav {
+	height: 100%;
+	width: 100%;
+	display: block;
+	color:#999;
+	text-align: center;
+	font-size: 50px;
+	display: flex;
+  justify-content: center; /* align horizontal */
+  align-items: center; /* align vertical */
+}
+
+.pic-nav:hover {
+	text-decoration: none;
+	cursor: pointer;
+	color:#fff;
 }

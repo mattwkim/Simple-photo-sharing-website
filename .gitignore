@@ -1,1 +1,3 @@
 controllers/*.pyc
+static/images
+backup_imgs

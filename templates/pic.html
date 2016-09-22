@@ -2,11 +2,11 @@
 {% block content %}
 <div id="pic-content">
 
-  <a href="/album?albumid={{data.albumid}}" id="parent_album"><i class="fa fa-times" aria-hidden="true"></i></a>
+  <a href="{{ url_for('main.album_route', albumid=data.albumid) }}" id="parent_album"><i class="fa fa-times" aria-hidden="true"></i></a>
 
   <div class="col-xs-2 pic-nav-container">
     {% if data.prev != "" %}
-    <a href="/pic?picid={{data.prev}}" id="prev_pic" class="pic-nav">
+    <a href="{{ url_for('main.pic_route', picid=data.prev) }}" id="prev_pic" class="pic-nav">
       <i class="fa fa-chevron-left" aria-hidden="true"></i>
     </a>
     {% endif %}
@@ -18,7 +18,7 @@
 
   <div class="col-xs-2 pic-nav-container">
     {% if data.next != "" %}
-    <a href="/pic?picid={{data.next}}" id="next_pic" class="pic-nav">
+    <a href="{{ url_for('main.pic_route', picid=data.next) }}" id="next_pic" class="pic-nav">
       <i class="fa fa-chevron-right" aria-hidden="true"></i>
     </a>
     {% endif %}

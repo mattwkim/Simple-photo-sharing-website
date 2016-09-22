@@ -69,17 +69,16 @@ def pic_route():
     result = cur.fetchone()
     data['current_format'] = result['format']
 
-    #Get the pic id of the image one less of the sequence number; Make sure they have same album id
-    cur.execute("SELECT picid FROM Contain WHERE sequencenum='" + str(pic_seq - 1) + "' AND albumid='" + str(data['albumid']) + "'")
-    result = cur.fetchone()
-    if result:
-        data['prev'] = result['picid'];
 
-    #Get the pic id of the image one less of the sequence number; Make sure they have same album id
-    cur.execute("SELECT picid FROM Contain WHERE sequencenum='" + str(pic_seq + 1) + "' AND albumid='" + str(data['albumid']) + "'")
-    result = cur.fetchone()
-    if result:
-        data['next'] = result['picid'];
+    #Get the pic id of all the images in the databse with the album id in order of seq num
+    #Then select the next and prev pic compared to the photos seq number
+    cur.execute("SELECT picid FROM Contain WHERE albumid='" + str(data['albumid']) + "' ORDER BY sequencenum ASC")
+    results = cur.fetchall()
+    for index in range(len(results)):
+        if results[index]['picid'] == data['current'] and index != len(results) - 1:
+            data['next'] = results[index + 1]['picid']
+        if results[index]['picid'] == data['current'] and index != 0:
+            data['prev'] = results[index - 1]['picid']
 
     return render_template("pic.html", data = data)
 
@@ -99,24 +98,52 @@ def album_route():
 
 	return render_template("album.html", photos = photos)
 
-def connect_to_database():
-  options = {
-    'host': 'localhost',
-    'user': 'root',
-    'passwd': 'root',
-    'db': 'groupXXp1',
-    'cursorclass' : MySQLdb.cursors.DictCursor
-  }
-  db = MySQLdb.connect(**options)
-  db.autocommit(True)
-  return db
+@main.route('/albums/edit', methods=['GET', 'POST'])
+def albums_edit_route():
+    #Connect to database
+    db = connect_to_database()
+    cur = db.cursor()
+    #Get username from url
+    username = request.args.get('username')
+    #Get Post data if form was submitted
+    opcode = request.form.get("op")
+
+    #Check if Opcode has a value
+    if opcode == "delete":
+        #Delete the album
+        albumid = request.form.get("albumid")
+        #Get pics to delete from album
+        cur.execute("SELECT picid FROM Contain WHERE albumid = '" + albumid + "';")
+        results = cur.fetchall()
+        for result in results:
+            #Get photo format
+            cur.execute("SELECT format FROM Photo WHERE picid='" + result['picid'] + "';")
+            photoFormat = cur.fetchone()
+            #Delete photo from file
+            os.remove("static/images/" + result['picid'] + "." + photoFormat['format'])
+            #Delete photo from database
+            cur.execute("DELETE FROM Contain WHERE picid='" + result['picid'] + "';")
+            cur.execute("DELETE FROM Photo WHERE picid='" + result['picid'] + "';")
+        #Delete album
+        cur.execute("DELETE FROM Album WHERE albumid='" + albumid + "';")
+
+    if opcode == "add":
+        #Add new album
+        title = request.form.get("title")
+        cur.execute("INSERT INTO Album (title, username) VALUES ('" + title + "', '" + username + "');")
+
+
+    cur.execute("SELECT albumid, title FROM Album WHERE username = '" + username + "';")
+    results = cur.fetchall()
+    albums = []
+    for result in results:
+        albums.append({"title":result['title'], "id":result['albumid']})
+
+    return render_template("albums_edit.html", albums = albums, username = username)
 
 @main.route('/album/edit', methods=["GET", "POST"])
-
 def album_edit_route():
-
     if request.method == "GET" :
-
         albumid = request.args.get('albumid')
         db = connect_to_database()
         cur = db.cursor()
@@ -133,9 +160,13 @@ def album_edit_route():
         return render_template("album_edit.html", photos=photos, albumid=albumid)
 
     if request.method == "POST" :
-        if (request.form.get("op") == "add"):
 
-            album_id = request.form.get("albumid")
+        #They are editing the album so get the info that they sent in the post
+        albumid = request.form.get('albumid')
+        db = connect_to_database()
+        cur = db.cursor()
+
+        if (request.form.get("op") == "add"):
 
             if 'file' not in request.files:
                 flash('No file part')
@@ -146,43 +177,76 @@ def album_edit_route():
             if file.filename == '':
                 flash('No selected file')
 
+            #grabs information for valid file names
             if file and allowed_file(file.filename):
 
                 filename, file_type = os.path.splitext(file.filename)
                 filename_full = filename + file_type
                 file_type_no_dot = file_type[1:]
 
-                m = hashlib.md5(str(album_id) + filename_full)
+                m = hashlib.md5(str(albumid) + filename_full)
                 hashed_filename = m.hexdigest()
                 full_hashed = hashed_filename + file_type
              
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], full_hashed))
 
-                db = connect_to_database()
+                
                 cur = db.cursor()
                 cur.execute('SELECT MAX(sequencenum) FROM Contain')
                 high_sequence = cur.fetchall()
                 sequencenum = high_sequence[0]['MAX(sequencenum)']
+
+                #error checks for if no info in database
                 if sequencenum is None:
                     sequencenum = 0
                 else:
                     sequencenum += 1
+
+                #updates database for Photo, Contain, and Album's lastupdated
                 sequencenum = str(sequencenum)
                 cur = db.cursor()
                 cur.execute("INSERT INTO Photo (picid, format) VALUES ( '" + str(hashed_filename) + "', '" + str(file_type_no_dot) + "');")
                 cur = db.cursor()
-                cur.execute("INSERT INTO Contain (sequencenum, albumid, picid, caption) VALUES ( '" + sequencenum + "', '" + album_id + "', '" + hashed_filename + "', '');" )
+                cur.execute("INSERT INTO Contain (sequencenum, albumid, picid, caption) VALUES ( '" + sequencenum + "', '" + albumid + "', '" + hashed_filename + "', '');" )
                 cur = db.cursor()
-                cur.execute("UPDATE Album SET lastupdated=CURRENT_TIMESTAMP WHERE albumid=" + album_id + ";")
+                cur.execute("UPDATE Album SET lastupdated=CURRENT_TIMESTAMP WHERE albumid=" + albumid + ";")
 
-                cur = db.cursor()
-                cur.execute('SELECT Contain.picid, Photo.format FROM Contain INNER JOIN Photo on Contain.picid=Photo.picid WHERE albumid = ' + album_id + ';')
-                results = cur.fetchall()
-                photos = []
-                for result in results:
-                    pair = []
-                    pair.append(result['picid'])
-                    pair.append(result['format'])
-                    photos.append(pair)
+        
+        #If opcode was delete then delete the image
+        if request.form.get('op') == "delete":
+            picid = str(request.form['picid'])
+            #Get pics format
+            cur.execute("SELECT format From Photo WHERE picid='" + picid + "';")
+            photoFormat = cur.fetchone()
+            #Delete the pic from the database
+            cur.execute("DELETE FROM Contain WHERE albumid='" + albumid + "' AND picid=" + "'" + picid + "';")
+            cur.execute("DELETE FROM Photo WHERE picid='" + picid + "';")
+            #Remove the photo from server
+            os.remove("static/images/" + picid + "." + photoFormat['format'])
 
-                return render_template("album_edit.html", photos=photos, albumid=album_id)
+        #cursor to database and returns template
+        cur = db.cursor()
+        cur.execute('SELECT Contain.picid, Photo.format FROM Contain INNER JOIN Photo on Contain.picid=Photo.picid WHERE albumid = ' + albumid + ';')
+        results = cur.fetchall()
+        photos = []
+        for result in results:
+            pair = []
+            pair.append(result['picid'])
+            pair.append(result['format'])
+            photos.append(pair)
+
+        return render_template("album_edit.html", photos=photos, albumid=albumid)
+
+
+
+def connect_to_database():
+  options = {
+    'host': 'localhost',
+    'user': 'root',
+    'passwd': 'root',
+    'db': 'groupXXp1',
+    'cursorclass' : MySQLdb.cursors.DictCursor
+  }
+  db = MySQLdb.connect(**options)
+  db.autocommit(True)
+  return db

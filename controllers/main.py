@@ -1,8 +1,24 @@
+import os
 from flask import *
+import hashlib
+from werkzeug.utils import secure_filename
 import MySQLdb
 import MySQLdb.cursors
 
 main = Blueprint('main', __name__, template_folder='templates')
+
+#=================For uploading files======================#
+
+UPLOAD_FOLDER = "static/images"
+ALLOWED_EXTENSIONS = set(['png', 'jpg', 'bmp', 'gif'])
+
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
+
+#==========================================================#
 
 @main.route('/')
 def main_route():
@@ -28,6 +44,7 @@ def albums_route():
         albums.append(result['title'])
         ids.append(result['albumid'])
     return render_template("albums.html", usernamealbums = albums, thealbumids = ids, username = username)
+
 @main.route('/pic')
 def pic_route():
     data = {
@@ -75,13 +92,13 @@ def album_route():
 	results = cur.fetchall()
 	photos = []
 	for result in results:
-
 		pair = []
 		pair.append(result['picid'])
 		pair.append(result['format'])
-
 		photos.append(pair)
+
 	return render_template("album.html", photos = photos)
+
 def connect_to_database():
   options = {
     'host': 'localhost',
@@ -93,3 +110,79 @@ def connect_to_database():
   db = MySQLdb.connect(**options)
   db.autocommit(True)
   return db
+
+@main.route('/album/edit', methods=["GET", "POST"])
+
+def album_edit_route():
+
+    if request.method == "GET" :
+
+        albumid = request.args.get('albumid')
+        db = connect_to_database()
+        cur = db.cursor()
+        cur.execute('SELECT Contain.picid, Photo.format FROM Contain INNER JOIN Photo on Contain.picid=Photo.picid WHERE albumid = ' + albumid + ';')
+        results = cur.fetchall()
+        photos = []
+
+        for result in results:
+            pair = []
+            pair.append(result['picid'])
+            pair.append(result['format'])
+            photos.append(pair)
+
+        return render_template("album_edit.html", photos=photos, albumid=albumid)
+
+    if request.method == "POST" :
+        if (request.form.get("op") == "add"):
+
+            album_id = request.form.get("albumid")
+
+            if 'file' not in request.files:
+                flash('No file part')
+            file = request.files['file']
+
+            # if user does not select file, browser also
+            # submit a empty part without filename
+            if file.filename == '':
+                flash('No selected file')
+
+            if file and allowed_file(file.filename):
+
+                filename, file_type = os.path.splitext(file.filename)
+                filename_full = filename + file_type
+                file_type_no_dot = file_type[1:]
+
+                m = hashlib.md5(str(album_id) + filename_full)
+                hashed_filename = m.hexdigest()
+                full_hashed = hashed_filename + file_type
+             
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], full_hashed))
+
+                db = connect_to_database()
+                cur = db.cursor()
+                cur.execute('SELECT MAX(sequencenum) FROM Contain')
+                high_sequence = cur.fetchall()
+                sequencenum = high_sequence[0]['MAX(sequencenum)']
+                if sequencenum is None:
+                    sequencenum = 0
+                else:
+                    sequencenum += 1
+                sequencenum = str(sequencenum)
+                cur = db.cursor()
+                cur.execute("INSERT INTO Photo (picid, format) VALUES ( '" + str(hashed_filename) + "', '" + str(file_type_no_dot) + "');")
+                cur = db.cursor()
+                cur.execute("INSERT INTO Contain (sequencenum, albumid, picid, caption) VALUES ( '" + sequencenum + "', '" + album_id + "', '" + hashed_filename + "', '');" )
+                cur = db.cursor()
+                cur.execute("UPDATE Album SET lastupdated=CURRENT_TIMESTAMP WHERE albumid=" + album_id + ";")
+
+                cur = db.cursor()
+                cur.execute('SELECT Contain.picid, Photo.format FROM Contain INNER JOIN Photo on Contain.picid=Photo.picid WHERE albumid = ' + album_id + ';')
+                results = cur.fetchall()
+                photos = []
+                for result in results:
+                    pair = []
+                    pair.append(result['picid'])
+                    pair.append(result['format'])
+                    photos.append(pair)
+
+                return render_template("album_edit.html", photos=photos, albumid=album_id)

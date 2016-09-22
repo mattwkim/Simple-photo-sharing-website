@@ -2,6 +2,7 @@ from flask import *
 import os
 import MySQLdb
 import MySQLdb.cursors
+import os
 
 main = Blueprint('main', __name__, template_folder='templates')
 
@@ -29,6 +30,7 @@ def albums_route():
         albums.append(result['title'])
         ids.append(result['albumid'])
     return render_template("albums.html", usernamealbums = albums, thealbumids = ids, username = username)
+
 @main.route('/pic')
 def pic_route():
     data = {
@@ -53,17 +55,16 @@ def pic_route():
     result = cur.fetchone()
     data['current_format'] = result['format']
 
-    #Get the pic id of the image one less of the sequence number; Make sure they have same album id
-    cur.execute("SELECT picid FROM Contain WHERE sequencenum='" + str(pic_seq - 1) + "' AND albumid='" + str(data['albumid']) + "'")
-    result = cur.fetchone()
-    if result:
-        data['prev'] = result['picid'];
 
-    #Get the pic id of the image one less of the sequence number; Make sure they have same album id
-    cur.execute("SELECT picid FROM Contain WHERE sequencenum='" + str(pic_seq + 1) + "' AND albumid='" + str(data['albumid']) + "'")
-    result = cur.fetchone()
-    if result:
-        data['next'] = result['picid'];
+    #Get the pic id of all the images in the databse with the album id in order of seq num
+    #Then select the next and prev pic compared to the photos seq number
+    cur.execute("SELECT picid FROM Contain WHERE albumid='" + str(data['albumid']) + "' ORDER BY sequencenum ASC")
+    results = cur.fetchall()
+    for index in range(len(results)):
+        if results[index]['picid'] == data['current'] and index != len(results) - 1:
+            data['next'] = results[index + 1]['picid']
+        if results[index]['picid'] == data['current'] and index != 0:
+            data['prev'] = results[index - 1]['picid']
 
     return render_template("pic.html", data = data)
 
@@ -84,41 +85,81 @@ def album_route():
 		photos.append(pair)
 	return render_template("album.html", photos = photos)
 
-@main.route('/album/edit', methods=['POST', 'GET'])
-def album_edit_route():
-    if request.method == "GET":
-        albumid = request.args.get('albumid')
-        db = connect_to_database()
-        cur = db.cursor()
-        cur.execute('SELECT Contain.picid, Photo.format FROM Contain INNER JOIN Photo on Contain.picid=Photo.picid WHERE albumid = ' + albumid + ';')
-        results = cur.fetchall()
-        photos = []
-        for result in results:
-            pair = []
-            pair.append(result['picid'])
-            pair.append(result['format'])
-            photos.append(pair)
-        return render_template("album_edit.html", photos = photos, albumid = albumid)
-    albumid = str(request.form['albumid'])
-    op = str(request.form['op'])
-    picid = str(request.form['picid'])
+@main.route('/albums/edit', methods=['GET', 'POST'])
+def albums_edit_route():
+    #Connect to database
     db = connect_to_database()
     cur = db.cursor()
-    cur.execute("SELECT format From Photo WHERE picid='" + picid + "';")
-    theformat = cur.fetchall()
-    cur.execute("DELETE FROM Contain WHERE albumid='" + albumid + "' AND picid=" + "'" + picid + "';")
-    cur.execute("DELETE FROM Photo WHERE picid='" + picid + "';")
-    os.system("rm static/images/" + picid + "." + theformat[0]['format'])
+    #Get username from url
+    username = request.args.get('username')
+    #Get Post data if form was submitted
+    opcode = request.form.get("op")
+
+    #Check if Opcode has a value
+    if opcode == "delete":
+        #Delete the album
+        albumid = request.form.get("albumid")
+        #Get pics to delete from album
+        cur.execute("SELECT picid FROM Contain WHERE albumid = '" + albumid + "';")
+        results = cur.fetchall()
+        for result in results:
+            #Get photo format
+            cur.execute("SELECT format FROM Photo WHERE picid='" + result['picid'] + "';")
+            photoFormat = cur.fetchone()
+            #Delete photo from file
+            os.remove("static/images/" + result['picid'] + "." + photoFormat['format'])
+            #Delete photo from database
+            cur.execute("DELETE FROM Contain WHERE picid='" + result['picid'] + "';")
+            cur.execute("DELETE FROM Photo WHERE picid='" + result['picid'] + "';")
+        #Delete album
+        cur.execute("DELETE FROM Album WHERE albumid='" + albumid + "';")
+
+    if opcode == "add":
+        #Add new album
+        title = request.form.get("title")
+        cur.execute("INSERT INTO Album (title, username) VALUES ('" + title + "', '" + username + "');")
+
+
+    cur.execute("SELECT albumid, title FROM Album WHERE username = '" + username + "';")
+    results = cur.fetchall()
+    albums = []
+    for result in results:
+        albums.append({"title":result['title'], "id":result['albumid']})
+
+    return render_template("albums_edit.html", albums = albums, username = username)
+
+@main.route('/album/edit', methods=['POST', 'GET'])
+def album_edit_route():
+    #Connect to database
+    db = connect_to_database()
+    cur = db.cursor()
+    #Check if user sent data via post method
+    if request.method == "POST":
+        #They are editing the album so get the info that they sent in the post
+        albumid = str(request.form['albumid'])
+        op = str(request.form['op'])
+        #If opcode was delete then delete the image
+        if op == "delete":
+            picid = str(request.form['picid'])
+            #Get pics format
+            cur.execute("SELECT format From Photo WHERE picid='" + picid + "';")
+            photoFormat = cur.fetchone()
+            #Delete the pic from the database
+            cur.execute("DELETE FROM Contain WHERE albumid='" + albumid + "' AND picid=" + "'" + picid + "';")
+            cur.execute("DELETE FROM Photo WHERE picid='" + picid + "';")
+            #Remove the photo from server
+            os.remove("static/images/" + picid + "." + photoFormat['format'])
+    #Get all images from database and render them
     cur.execute('SELECT Contain.picid, Photo.format FROM Contain INNER JOIN Photo on Contain.picid=Photo.picid WHERE albumid = ' + albumid + ';')
     results = cur.fetchall()
     photos = []
     for result in results:
-        pair = [] 
+        pair = []
         pair.append(result['picid'])
         pair.append(result['format'])
         photos.append(pair)
     return render_template("album_edit.html", photos = photos, albumid = albumid)
-    
+
 def connect_to_database():
   options = {
     'host': 'localhost',

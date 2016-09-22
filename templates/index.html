@@ -6,7 +6,7 @@
     </p>
     <ul>
     {% for username in usernames %}
-        <li> <a href="albums?username={{username}}" id="user_albums_{{username}}"> {{username}} </a> </li>
+        <li> <a href="{{ url_for('main.albums_route', username=username) }}" id="user_albums_{{username}}"> {{username}} </a> </li>
     {% endfor %}
     </ul>
 {% endblock %}

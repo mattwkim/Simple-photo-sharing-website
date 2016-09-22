@@ -1,4 +1,5 @@
 from flask import *
+import os
 import MySQLdb
 import MySQLdb.cursors
 
@@ -82,6 +83,42 @@ def album_route():
 
 		photos.append(pair)
 	return render_template("album.html", photos = photos)
+
+@main.route('/album/edit', methods=['POST', 'GET'])
+def album_edit_route():
+    if request.method == "GET":
+        albumid = request.args.get('albumid')
+        db = connect_to_database()
+        cur = db.cursor()
+        cur.execute('SELECT Contain.picid, Photo.format FROM Contain INNER JOIN Photo on Contain.picid=Photo.picid WHERE albumid = ' + albumid + ';')
+        results = cur.fetchall()
+        photos = []
+        for result in results:
+            pair = []
+            pair.append(result['picid'])
+            pair.append(result['format'])
+            photos.append(pair)
+        return render_template("album_edit.html", photos = photos, albumid = albumid)
+    albumid = str(request.form['albumid'])
+    op = str(request.form['op'])
+    picid = str(request.form['picid'])
+    db = connect_to_database()
+    cur = db.cursor()
+    cur.execute("SELECT format From Photo WHERE picid='" + picid + "';")
+    theformat = cur.fetchall()
+    cur.execute("DELETE FROM Contain WHERE albumid='" + albumid + "' AND picid=" + "'" + picid + "';")
+    cur.execute("DELETE FROM Photo WHERE picid='" + picid + "';")
+    os.system("rm static/images/" + picid + "." + theformat[0]['format'])
+    cur.execute('SELECT Contain.picid, Photo.format FROM Contain INNER JOIN Photo on Contain.picid=Photo.picid WHERE albumid = ' + albumid + ';')
+    results = cur.fetchall()
+    photos = []
+    for result in results:
+        pair = [] 
+        pair.append(result['picid'])
+        pair.append(result['format'])
+        photos.append(pair)
+    return render_template("album_edit.html", photos = photos, albumid = albumid)
+    
 def connect_to_database():
   options = {
     'host': 'localhost',

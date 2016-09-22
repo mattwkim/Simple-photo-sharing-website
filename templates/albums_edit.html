@@ -13,7 +13,7 @@
 <tr>
 
   <td>{{album.title}}</td>
-  <td><a href="{{ url_for('main.album_edit_route', albumid=album.id) }}"> [Edit]</a></td>
+  <td><a href="{{ url_for('main.album_edit_route', albumid=album.id) }}" id="edit_album_{{album.id}}"> [Edit]</a></td>
   <td>
     <form action="{{ url_for('main.albums_edit_route', username=username) }}" method="post">
       <input type="hidden" name="op" value="delete">

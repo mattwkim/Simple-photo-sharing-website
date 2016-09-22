@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+
+<table>
+  <tr>
+    <td>Album</td>
+    <td>Edit</td>
+    <td>Delete</td>
+  </tr>
+
+{% for album in albums %}
+
+<tr>
+
+  <td>{{album.title}}</td>
+  <td><a href="{{ url_for('main.album_edit_route', albumid=album.id) }}"> [Edit]</a></td>
+  <td>
+    <form action="{{ url_for('main.albums_edit_route', username=username) }}" method="post">
+      <input type="hidden" name="op" value="delete">
+      <input type="hidden" name="albumid" value="{{album.id}}">
+      <input id="delete_album_{{album.id}}" type="submit" value="Delete">
+    </form>
+  </td>
+
+</tr>
+
+{% endfor %}
+
+  <tr>
+    <form action="{{ url_for('main.albums_edit_route', username=username) }}" method="post">
+      <input type="hidden" name="op" value="add">
+      <td><input type="text" id="album_add_name" name="title"/></td>
+      <td><input id="album_add_submit" type="submit" value="Add"/></td>
+    </form>
+  </tr>
+</table>
+
+{% endblock %}

@@ -1,6 +1,7 @@
 from flask import *
 import MySQLdb
 import MySQLdb.cursors
+import os
 
 main = Blueprint('main', __name__, template_folder='templates')
 
@@ -28,6 +29,7 @@ def albums_route():
         albums.append(result['title'])
         ids.append(result['albumid'])
     return render_template("albums.html", usernamealbums = albums, thealbumids = ids, username = username)
+
 @main.route('/pic')
 def pic_route():
     data = {
@@ -82,6 +84,55 @@ def album_route():
 
 		photos.append(pair)
 	return render_template("album.html", photos = photos)
+
+
+@main.route('/album/edit')
+def album_edit_route():
+    return "test"
+
+@main.route('/albums/edit', methods=['GET', 'POST'])
+def albums_edit_route():
+    #Connect to database
+    db = connect_to_database()
+    cur = db.cursor()
+    #Get username from url
+    username = request.args.get('username')
+    #Get Post data if form was submitted
+    opcode = request.form.get("op")
+
+    #Check if Opcode has a value
+    if opcode == "delete":
+        #Delete the album
+        albumid = request.form.get("albumid")
+        #Get pics to delete from album
+        cur.execute("SELECT picid FROM Contain WHERE albumid = '" + albumid + "';")
+        results = cur.fetchall()
+        for result in results:
+            #Get photo format
+            cur.execute("SELECT format FROM Photo WHERE picid='" + result['picid'] + "';")
+            photoFormat = cur.fetchone()
+            #Delete photo from file
+            os.remove("static/images/" + result['picid'] + "." + photoFormat['format'])
+            #Delete photo from database
+            cur.execute("DELETE FROM Contain WHERE picid='" + result['picid'] + "';")
+            cur.execute("DELETE FROM Photo WHERE picid='" + result['picid'] + "';")
+        #Delete album
+        cur.execute("DELETE FROM Album WHERE albumid='" + albumid + "';")
+
+    if opcode == "add":
+        #Add new album
+        title = request.form.get("title")
+        cur.execute("INSERT INTO Album (title, username) VALUES ('" + title + "', '" + username + "');")
+
+
+    cur.execute("SELECT albumid, title FROM Album WHERE username = '" + username + "';")
+    results = cur.fetchall()
+    albums = []
+    for result in results:
+        albums.append({"title":result['title'], "id":result['albumid']})
+
+    return render_template("albums_edit.html", albums = albums, username = username)
+
 def connect_to_database():
   options = {
     'host': 'localhost',

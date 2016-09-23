@@ -1,10 +1,24 @@
-from flask import *
 import os
+from flask import *
+import hashlib
+from werkzeug.utils import secure_filename
 import MySQLdb
 import MySQLdb.cursors
-import os
 
 main = Blueprint('main', __name__, template_folder='templates')
+
+#=================For uploading files======================#
+
+UPLOAD_FOLDER = "static/images"
+ALLOWED_EXTENSIONS = set(['png', 'jpg', 'bmp', 'gif'])
+
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
+
+#==========================================================#
 
 @main.route('/')
 def main_route():
@@ -77,12 +91,11 @@ def album_route():
 	results = cur.fetchall()
 	photos = []
 	for result in results:
-
 		pair = []
 		pair.append(result['picid'])
 		pair.append(result['format'])
-
 		photos.append(pair)
+
 	return render_template("album.html", photos = photos)
 
 @main.route('/albums/edit', methods=['GET', 'POST'])
@@ -128,19 +141,69 @@ def albums_edit_route():
 
     return render_template("albums_edit.html", albums = albums, username = username)
 
-@main.route('/album/edit', methods=['POST', 'GET'])
+@main.route('/album/edit', methods=["GET", "POST"])
 def album_edit_route():
+
     #Connect to database
     db = connect_to_database()
     cur = db.cursor()
     albumid = request.args.get('albumid')
+
     #Check if user sent data via post method
-    if request.method == "POST":
+    if request.method == "POST" :
         #They are editing the album so get the info that they sent in the post
-        albumid = str(request.form['albumid'])
-        op = str(request.form['op'])
+        albumid = request.form.get('albumid')
+        db = connect_to_database()
+        cur = db.cursor()
+
+        if (request.form.get("op") == "add"):
+
+            if 'file' not in request.files:
+                flash('No file part')
+            file = request.files['file']
+
+            # if user does not select file, browser also
+            # submit a empty part without filename
+            if file.filename == '':
+                flash('No selected file')
+
+            #grabs information for valid file names
+            if file and allowed_file(file.filename):
+
+                filename, file_type = os.path.splitext(file.filename)
+                filename_full = filename + file_type
+                file_type_no_dot = file_type[1:]
+
+                m = hashlib.md5(str(albumid) + filename_full)
+                hashed_filename = m.hexdigest()
+                full_hashed = hashed_filename + file_type
+
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], full_hashed))
+
+
+                cur = db.cursor()
+                cur.execute('SELECT MAX(sequencenum) FROM Contain')
+                high_sequence = cur.fetchall()
+                sequencenum = high_sequence[0]['MAX(sequencenum)']
+
+                #error checks for if no info in database
+                if sequencenum is None:
+                    sequencenum = 0
+                else:
+                    sequencenum += 1
+
+                #updates database for Photo, Contain, and Album's lastupdated
+                sequencenum = str(sequencenum)
+                cur = db.cursor()
+                cur.execute("INSERT INTO Photo (picid, format) VALUES ( '" + str(hashed_filename) + "', '" + str(file_type_no_dot) + "');")
+                cur = db.cursor()
+                cur.execute("INSERT INTO Contain (sequencenum, albumid, picid, caption) VALUES ( '" + sequencenum + "', '" + albumid + "', '" + hashed_filename + "', '');" )
+                cur = db.cursor()
+                cur.execute("UPDATE Album SET lastupdated=CURRENT_TIMESTAMP WHERE albumid=" + albumid + ";")
+
+
         #If opcode was delete then delete the image
-        if op == "delete":
+        if request.form.get('op') == "delete":
             picid = str(request.form['picid'])
             #Get pics format
             cur.execute("SELECT format From Photo WHERE picid='" + picid + "';")
@@ -150,7 +213,9 @@ def album_edit_route():
             cur.execute("DELETE FROM Photo WHERE picid='" + picid + "';")
             #Remove the photo from server
             os.remove("static/images/" + picid + "." + photoFormat['format'])
-    #Get all images from database and render them
+
+    #cursor to database and returns template
+    cur = db.cursor()
     cur.execute('SELECT Contain.picid, Photo.format FROM Contain INNER JOIN Photo on Contain.picid=Photo.picid WHERE albumid = ' + albumid + ';')
     results = cur.fetchall()
     photos = []
@@ -159,7 +224,10 @@ def album_edit_route():
         pair.append(result['picid'])
         pair.append(result['format'])
         photos.append(pair)
-    return render_template("album_edit.html", photos = photos, albumid = albumid)
+
+    return render_template("album_edit.html", photos=photos, albumid=albumid)
+
+
 
 def connect_to_database():
   options = {

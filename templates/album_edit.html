@@ -2,14 +2,24 @@
 {% block content %}
 
 	{% for photo in photos %}
-	<form action="/album/edit?albumid={{albumid}}" method="POST">
+	<form action="{{ url_for('main.album_edit_route', albumid=albumid) }}" method="POST">
     	<input type="hidden" name="op" value="delete" />
     	<input type="hidden" name="albumid" value="{{albumid}}" />
     	<input type="hidden" name="picid" value="{{photo[0]}}"/>
-    	<input type="submit" value="Delete entry" id="delete_pic_{{photo[0]}}" />
+    	<input type="submit" value="Delete entry" id="delete_pic_{{ photo[0] }}"/>
 		<a text-decoration=none href="/pic?picid={{ photo[0] }}" id="pic_{{ photo[0] }}_link">
 			<img height=100px width=100px src="../static/images/{{ photo[0] }}.{{ photo[1] }}">
 		</a>
 	</form>
 	{% endfor %}
+
+	<form action="{{ url_for('main.album_edit_route', albumid=albumid) }}" method=post enctype=multipart/form-data>
+		<input type="hidden" name="op" value="add">
+		<input type="hidden" name="albumid" value="{{ albumid }}">
+
+
+		<input id="file_input" type=file name=file>
+		<input id="file_submit" type="submit">
+	</form>
+
 {% endblock %}

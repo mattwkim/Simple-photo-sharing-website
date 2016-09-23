@@ -133,6 +133,7 @@ def album_edit_route():
     #Connect to database
     db = connect_to_database()
     cur = db.cursor()
+    albumid = request.args.get('albumid')
     #Check if user sent data via post method
     if request.method == "POST":
         #They are editing the album so get the info that they sent in the post

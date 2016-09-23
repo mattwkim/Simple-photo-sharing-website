@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block content %}'
+{% block content %}
 
 	{% for photo in photos %}
-	<form action="/album/edit?albumid={{albumid}}" method="POST" id="file_input">
+	<form action="/album/edit?albumid={{albumid}}" method="POST">
     	<input type="hidden" name="op" value="delete" />
     	<input type="hidden" name="albumid" value="{{albumid}}" />
     	<input type="hidden" name="picid" value="{{photo[0]}}"/>
-    	<input type="submit" value="Delete entry" id="file_submit" />
+    	<input type="submit" value="Delete entry" id="delete_pic_{{photo[0]}}" />
 		<a text-decoration=none href="/pic?picid={{ photo[0] }}" id="pic_{{ photo[0] }}_link">
 			<img height=100px width=100px src="../static/images/{{ photo[0] }}.{{ photo[1] }}">
 		</a>
